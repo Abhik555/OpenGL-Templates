@@ -1,0 +1,169 @@
+package com.abthedev.marcel;
+
+import com.abthedev.marcel.Listeners.KeyListener;
+import com.abthedev.marcel.Listeners.MouseListener;
+import com.abthedev.marcel.scenemanager.LevelEditorScene;
+import com.abthedev.marcel.scenemanager.Scene;
+import com.abthedev.marcel.scenemanager.scenes.LevelScene;
+import com.abthedev.marcel.time.Time;
+import org.lwjgl.*;
+import org.lwjgl.glfw.*;
+import org.lwjgl.opengl.*;
+
+import static org.lwjgl.glfw.Callbacks.*;
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.system.MemoryUtil.*;
+
+public class Window {
+
+    private int width , height;
+    private String title;
+    private float r,g,b,a;
+
+    private static Window window = null;
+
+    private long glfwWindow;
+    private boolean vSync = true;
+    private float fps = 0.0f;
+
+    private static Scene currentScene;
+
+    private Window(){
+        this.width = 1920;
+        this.height = 1080;
+        this.title = "Marcel 0.1 ALPHA BUILD 1";
+
+        this.r = 0.0f;
+        this.g = 0.0f;
+        this.b = 0.0f;
+        this.a = 1.0f;
+    }
+
+    public static void changeScene(int newScene){
+        switch (newScene){
+            case 0:
+                currentScene = new LevelEditorScene();
+                currentScene.init();
+                break;
+            case 1:
+                currentScene = new LevelScene();
+                currentScene.init();
+                break;
+            default:
+                assert false: "Unknown scene '"+newScene+"'";
+                break;
+
+        }
+    }
+
+    public static Window get(){
+        if(Window.window == null) {
+            Window.window = new Window();
+        }
+
+        return Window.window;
+    }
+
+    public void run(){
+        System.out.println("Loading LWJGL"+ Version.getVersion());
+
+        init();
+        loop();
+
+        // Free the window callbacks and destroy the window
+        glfwFreeCallbacks(glfwWindow);
+        glfwDestroyWindow(glfwWindow);
+
+        // Terminate GLFW and free the error callback
+        glfwTerminate();
+        glfwSetErrorCallback(null).free();
+    }
+
+    public void init() {
+        //Setup Error Callback
+        GLFWErrorCallback.createPrint(System.err).set();
+
+        //Init GLFW
+        if (!glfwInit()) {
+            throw new IllegalStateException("Unable to initialize GLFW");
+        }
+
+        //Configure Window
+        glfwDefaultWindowHints();
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+
+        //Create Window
+        glfwWindow = glfwCreateWindow(this.width, this.height, this.title, NULL, NULL);
+
+        if (glfwWindow == NULL) {
+            throw new IllegalStateException("Failed to create window");
+        }
+
+        //Mouse Listeners
+        glfwSetCursorPosCallback(glfwWindow , MouseListener::mousePosCallback);
+        glfwSetMouseButtonCallback(glfwWindow , MouseListener::mouseButtonCallback);
+        glfwSetScrollCallback(glfwWindow , MouseListener::mouseScrollCallback);
+
+        //Key Listeners
+        glfwSetKeyCallback(glfwWindow , KeyListener::keyCallback);
+
+        //Create OpenGL Context
+        glfwMakeContextCurrent(glfwWindow);
+
+        //Enable v-sync
+        if(vSync)
+            glfwSwapInterval(1);
+
+        //Show Window
+        glfwShowWindow(glfwWindow);
+
+        // This line is critical for LWJGL's interoperation with GLFW's
+        // OpenGL context, or any context that is managed externally.
+        // LWJGL detects the context that is current in the current thread,
+        // creates the GLCapabilities instance and makes the OpenGL
+        // bindings available for use.
+        GL.createCapabilities();
+
+        Window.changeScene(0);
+    }
+
+    public void loop(){
+        float beginTime = Time.getTime();
+        float endTime = Time.getTime();
+        float deltaTime = -1.0f;
+
+
+        while(!glfwWindowShouldClose(glfwWindow)){
+            //Poll Events
+            glfwPollEvents();
+
+            glClearColor(r , g , b , a);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            if(deltaTime >=0){
+                currentScene.update(deltaTime);
+            }
+
+
+            /*Example Listener
+            if(KeyListener.isKeyPresses(GLFW_KEY_SPACE)){
+                r = (float) Math.random();
+                g = (float) Math.random();
+                b = (float) Math.random();
+                a = (float) Math.random();
+            }*/
+
+            glfwSwapBuffers(glfwWindow);
+
+            endTime = Time.getTime();
+            deltaTime = endTime - beginTime;
+            beginTime = endTime;
+
+            //Keeping FPS Var
+            this.fps = (float) (1.0 / deltaTime);
+        }
+    }
+}
